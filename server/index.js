@@ -6,6 +6,13 @@ import userRoutes from "./routes/user.routes.js";
 import bookRoutes from "./routes/book.routes.js";
 import genreRoutes from "./routes/genre.routes.js";
 import cartRoutes from "./routes/cart.routes.js";
+import invoiceRoutes from "./routes/invoice.routes.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 
@@ -16,6 +23,7 @@ app.use(userRoutes);
 app.use(bookRoutes);
 app.use(genreRoutes);
 app.use(cartRoutes);
+app.use(invoiceRoutes);
 app.listen(PORT);
-
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 console.log("Server is running on port " + PORT);
