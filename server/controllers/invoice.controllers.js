@@ -3,7 +3,6 @@ import puppeteer from "puppeteer";
 import fs from "fs/promises";
 import path from "path";
 import { client } from "../db.js";
-import cli from "@angular/cli";
 
 export const confirmPayment = async (req, res) => {
   const { id } = req.params;

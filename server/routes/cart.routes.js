@@ -15,7 +15,6 @@ router.post("/addBookToCart", addBookToCart);
 router.post("/createPayment/:userId", createPayment);
 router.post("/uploadDeposit/:userId", upload.single("deposit"), uploadDeposit);
 router.get("/getCartByUserId/:userId", getCartItems);
-router.get("/getCartItems/:userId", getCartItems);
 router.delete("/clearCart/:userId", clearCart);
 router.delete("/deleteBookFromCart", deleteBookFromCart);
 

@@ -1,6 +1,6 @@
 import { client } from "../db.js";
 
-export const getUsers = async (req, res) => {
+export const getAllBooks = async (req, res) => {
   try {
     const result = await client.query("SELECT * FROM books");
     res.json(result.rows);
