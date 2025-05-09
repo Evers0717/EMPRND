@@ -15,22 +15,34 @@ export const getUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const result = await client.query(
-      "SELECT * FROM users WHERE email = $1 AND password = $2",
-      [email, password]
-    );
+    const result = await client.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
 
     if (result.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "Usuario no encontrado, verifica credenciales" });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
-    res.json(result.rows);
+    const user = result.rows[0];
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Contraseña incorrecta" });
+    }
+
+    res.status(200).json({
+      id: user.id_user,
+      name: user.name,
+      email: user.email,
+      adress: user.adress,
+      phone: user.phone,
+      created_at: user.created_at,
+    });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error al obtener el usuario: " + error.message });
+    return res.status(500).json({
+      message: "Error al verificar el usuario: " + error.message,
+    });
   }
 };
 
@@ -64,39 +76,5 @@ export const createUser = async (req, res) => {
     res.status(500).json({
       message: "Error al crear el usuario: " + error.message,
     });
-  }
-};
-
-export const updateTask = async (req, res) => {
-  try {
-    const result = await pool.query("UPDATE news SET ? WHERE id = ?", [
-      req.body,
-      req.params.id,
-    ]);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Noticia no encontrada" });
-    }
-
-    res.json({ message: "Noticia actualizada correctamente", result });
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error al obtener las noticias" + error });
-  }
-};
-export const deleteTask = async (req, res) => {
-  try {
-    const [result] = await pool.query("DELETE FROM news WHERE id = ?", [
-      req.params.id,
-    ]);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Noticia no encontrada" });
-    }
-    return res.sendStatus(204);
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Error al obtener las noticias" + error });
   }
 };

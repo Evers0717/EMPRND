@@ -8,7 +8,7 @@ const router = Router();
 
 router.get("/getUsers", getUsers);
 
-router.get("/getUser", getUser);
+router.post("/getUser", getUser);
 
 router.post("/CreateUser", createUser);
 
