@@ -45,6 +45,113 @@ export const getAllPayments = async (req, res) => {
   }
 };
 
+export const getUserPayments = async (req, res) => {
+  const { id_user } = req.params;
+  try {
+    const result = await client.query(
+      `SELECT 
+  p.id AS payment_id,
+  p.cart_id,
+  p.amount,
+  p.payment_status,
+  p.payment_proof_url,
+  p.created_at
+FROM payments p
+JOIN carts c ON p.cart_id = c.id_cart
+WHERE c.user_id = $1
+ORDER BY p.created_at DESC;`,
+      [id_user]
+    );
+    const payments = result.rows;
+    if (payments.length === 0) {
+      return res.status(404).json({ message: "No se encontraron pagos" });
+    }
+    res.status(200).json(payments);
+  } catch (error) {
+    console.error("Error al obtener los pagos del usuario: " + error.message);
+    throw new Error("Error al obtener los pagos del usuario");
+  }
+};
+
+export const getUserInvoicesByPaymentId = async (req, res) => {
+  const { userId, paymentId } = req.body;
+
+  try {
+    const invoiceResult = await client.query(
+      `
+      SELECT 
+        i.id AS invoice_id,
+        i.invoice_number,
+        i.invoice_url,
+        i.payment_id,
+        i.issued_at AS invoice_created_at,
+        p.amount,
+        p.payment_status,
+        p.created_at AS payment_created_at,
+        c.id_cart,
+        u.name AS user_name,
+        u.email AS customer_email,
+        u.adress AS user_address,
+        u.phone AS user_phone
+      FROM invoices i
+      JOIN payments p ON i.payment_id = p.id
+      JOIN carts c ON p.cart_id = c.id_cart
+      JOIN users u ON c.user_id = u.id_user
+      WHERE c.user_id = $1 AND p.id = $2
+      ORDER BY i.issued_at DESC
+      `,
+      [userId, paymentId]
+    );
+
+    const invoices = [];
+
+    for (const row of invoiceResult.rows) {
+      const itemsResult = await client.query(
+        `
+        SELECT
+          ci.id,
+          b.title,
+          ci.quantity,
+          ci.unit_price
+        FROM cart_items ci
+        JOIN books b ON ci.book_id = b.id_book
+        WHERE ci.cart_id = $1
+        `,
+        [row.id_cart]
+      );
+
+      invoices.push({
+        id: row.invoice_id,
+        invoice_number: row.invoice_number,
+        paymentId: row.payment_id,
+        invoiceUrl: row.invoice_url,
+        date: row.invoice_created_at,
+        amount: parseFloat(row.amount),
+        status: row.payment_status,
+        items: itemsResult.rows.map((item) => ({
+          id: item.id,
+          title: item.title,
+          quantity: item.quantity,
+          price: parseFloat(item.unit_price),
+        })),
+        paymentDate: row.payment_created_at,
+        downloadUrl: row.invoice_url || "#",
+        user: {
+          name: row.user_name,
+          address: row.user_address,
+          phone: row.user_phone,
+          customerEmail: row.customer_email,
+        },
+      });
+    }
+
+    res.status(200).json(invoices);
+  } catch (error) {
+    console.error("Error al obtener las facturas:", error.message);
+    res.status(500).json({ message: "Error al obtener las facturas" });
+  }
+};
+
 export const getUnconfirmedPayments = async (req, res) => {
   try {
     const result = await client.query(

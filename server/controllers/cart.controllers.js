@@ -27,7 +27,7 @@ const getActiveCartByUserId = async (userId) => {
 };
 
 export const addBookToCart = async (req, res) => {
-  const { bookId, user_id, quantity, unit_price } = req.body;
+  const { bookId, user_id, quantity } = req.body;
 
   try {
     let cart = await getActiveCartByUserId(user_id);
@@ -38,9 +38,14 @@ export const addBookToCart = async (req, res) => {
 
     const cartId = cart.id_cart;
 
+    let book_price = await client.query(
+      "SELECT price FROM books WHERE id_book = $1",
+      [bookId]
+    );
+
     const result = await client.query(
       "INSERT INTO cart_items (cart_id, book_id, quantity, unit_price) VALUES ($1, $2, $3, $4) RETURNING id",
-      [cartId, bookId, quantity, unit_price]
+      [cartId, bookId, quantity, book_price.rows[0].price]
     );
 
     const newCartItem = result.rows[0];
@@ -127,7 +132,10 @@ export const getCartItems = async (req, res) => {
     }
     const cartId = cart.id_cart;
     const result = await client.query(
-      "SELECT * FROM cart_items WHERE cart_id = $1",
+      `SELECT ci.*, b.title AS book_title ,b.image_url
+       FROM cart_items ci 
+       JOIN books b ON ci.book_id = b.id_book 
+       WHERE ci.cart_id = $1`,
       [cartId]
     );
     if (result.rowCount === 0) {
@@ -183,9 +191,10 @@ export const createPayment = async (req, res) => {
         message: "No se encontró un carrito activo para el usuario",
       });
     }
+
     const cartId = cart.id_cart;
     const totalPrice = await getTotalPrice(cartId);
-    //no se si quitar esto o no , ya que el carrito puede estar vacio pero que este bloqueado el pago hasta haya un libro
+
     if (totalPrice === 0) {
       return res.status(400).json({
         message: "El carrito está vacío",
@@ -196,16 +205,19 @@ export const createPayment = async (req, res) => {
       "INSERT INTO payments (cart_id, amount) VALUES ($1, $2) RETURNING id",
       [cartId, totalPrice]
     );
+
     if (result.rowCount === 0) {
       return res.status(500).json({
         message: "Error al procesar el pago",
       });
-    } else {
-      res.status(201).json({
-        message: "Falta el Comprpbante",
-        paymentId: result.rows[0].id,
-      });
     }
+
+    const paymentId = result.rows[0].id;
+
+    res.status(201).json({
+      message: "Pago creado. Falta subir el comprobante.",
+      paymentId,
+    });
   } catch (error) {
     console.error("Error al procesar el pago: " + error.message);
     res.status(500).json({
@@ -243,13 +255,23 @@ export const uploadDeposit = async (req, res) => {
       message: "No se adjuntó ningún archivo",
     });
   }
-  const filePath = file.path;
-
+  const fileName = file.filename;
+  const fileUrl = `/uploads/${fileName}`;
   try {
     await client.query(
       "UPDATE payments SET payment_proof_url = $1 WHERE cart_id = $2",
-      [filePath, cartId]
+      [fileUrl, cartId]
     );
+    const cartUpdate = await client.query(
+      "UPDATE carts SET status = '1' WHERE id_cart = $1",
+      [cartId]
+    );
+
+    if (cartUpdate.rowCount === 0) {
+      return res.status(500).json({
+        message: "Error al actualizar el carrito",
+      });
+    }
     res.status(200).json({
       message: "Depósito subido correctamente",
       filePath,
