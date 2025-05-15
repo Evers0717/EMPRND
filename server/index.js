@@ -25,5 +25,7 @@ app.use(genreRoutes);
 app.use(cartRoutes);
 app.use(invoiceRoutes);
 app.listen(PORT);
+const appRoot = path.resolve(__dirname, ".."); // apunta a la carpeta EMPRND
+app.use("/invoices", express.static(path.join(appRoot, "invoices")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 console.log("Server is running on port " + PORT);

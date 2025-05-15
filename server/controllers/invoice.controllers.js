@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import puppeteer from "puppeteer";
 import fs from "fs/promises";
 import path from "path";
+import QRCode from "qrcode";
 import { client } from "../db.js";
 
 export const confirmPayment = async (req, res) => {
@@ -221,35 +222,120 @@ export const createInvoice = async (req, res) => {
         .status(404)
         .json({ message: "No se encontraron elementos en el carrito" });
 
+    const qrDataUrl = await QRCode.toDataURL(`https://qrco.de/bfzneA`);
+
     const invoiceHTML = `
       <html>
-      <head>
+        <head>
         <style>
-          body { font-family: Arial; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          body {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          font-size: 12px;
+          color: #000;
+          }
+          .header {
+          text-align: center;
+          font-weight: bold;
+          margin-bottom: 20px;
+          }
+          .section {
+          margin-top: 20px;
+          }
+          table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+          }
+          th, td {
+          border: 1px solid #000;
+          padding: 5px;
+          text-align: left;
+          }
+          .totals {
+          float: right;
+          width: 40%;
+          margin-top: 20px;
+          }
+          .totals td {
+          border: none;
+          }
+          .info {
+          margin-top: 40px;
+          font-size: 10px;
+          }
+          .qr-container {
+          margin-top: 30px;
+          text-align: center;
+          }
         </style>
-      </head>
-      <body>
-        <h1>Factura</h1>
-        <p><strong>Orden #${paymentId}</strong></p>
-        <p><strong>Total:</strong> $${payment.rows[0].amount}</p>
+        </head>
+        <body>
+        <div class="header">
+          <h2>Comprobante auxiliar de factura electrónica</h2>
+          <p>Factura de Operación Interna</p>
+        </div>
+      
+        <div class="section">
+          <strong>Emisor:</strong> EL RINCON DORADO S.A.<br />
+          RUC: 1234567-8-91011<br />
+          Dirección: David, Edificio 123, Piso 69<br />
+          DV: 52
+        </div>
+      
+        <div class="section">
+          <strong>Cliente:</strong> ${user.rows[0].email}<br />
+          Teléfono: ${user.rows[0].phone || "N/A"}
+        </div>
+      
+        <div class="section">
+          <strong>Número de Orden:</strong> ${paymentId}<br />
+          <strong>Fecha:</strong> ${new Date().toLocaleDateString()}
+        </div>
+      
         <table>
           <thead>
-            <tr><th>Producto</th><th>Cantidad</th><th>Precio</th></tr>
+          <tr>
+            <th>No.</th>
+            <th>Descripción</th>
+            <th>Cantidad</th>
+            <th>Precio Unitario</th>
+            <th>Valor Total</th>
+          </tr>
           </thead>
           <tbody>
-            ${items.rows
-              .map(
-                (item) =>
-                  `<tr><td>${item.title}</td><td>${item.quantity}</td><td>$${item.unit_price}</td></tr>`
-              )
-              .join("")}
+          ${items.rows
+            .map(
+              (item, index) =>
+                `<tr>
+              <td>${index + 1}</td>
+              <td>${item.title}</td>
+              <td>${Number(item.quantity).toFixed(2)}</td>
+              <td>$${Number(item.unit_price).toFixed(2)}</td>
+              <td>$${(item.quantity * item.unit_price).toFixed(2)}</td>
+              </tr>`
+            )
+            .join("")}
           </tbody>
         </table>
-      </body>
+      
+        <table class="totals">
+          <tr><td>Total Neto:</td><td>$${Number(payment.rows[0].amount).toFixed(
+            2
+          )}</td></tr>
+          <tr><td>ITBMS (7%):</td><td>$${(0).toFixed(2)}</td></tr>
+          <tr><td><strong>Total a Pagar:</strong></td><td><strong>$${Number(
+            payment.rows[0].amount
+          ).toFixed(2)}</strong></td></tr>
+        </table>
+      
+        <div class="qr-container">
+          <p>Escanee el código para validar la factura</p>
+          <img src="${qrDataUrl}" width="150" />
+        </div>
+        </body>
       </html>
-    `;
+      `;
 
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
